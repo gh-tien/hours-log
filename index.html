@@ -137,6 +137,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     const doc = new DOMParser().parseFromString(template, 'text/html');
     document.documentElement.replaceWith(doc.documentElement);
     const dead = Array.from(document.scripts);
+    // The dc-siblings fetch-override (it patches window.fetch to serve embedded
+    // sub-components) must run BEFORE the framework tries to fetch them, else on
+    // static hosts those fetches 404 and components render as empty grey boxes.
+    // Body scripts otherwise run after the head framework script — reorder so the
+    // override installs first, deterministically, on every browser.
+    dead.sort(function(a, b){
+      var aov = (/__dc_siblings/.test(a.textContent || '') && /window\.fetch/.test(a.textContent || '')) ? -1 : 0;
+      var bov = (/__dc_siblings/.test(b.textContent || '') && /window\.fetch/.test(b.textContent || '')) ? -1 : 0;
+      return aov - bov;
+    });
     for (const old of dead) {
       const s = document.createElement('script');
       for (const a of old.attributes) s.setAttribute(a.name, a.value);
